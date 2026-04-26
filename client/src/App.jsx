@@ -1,6 +1,6 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
-import Admin from "./admin.js";
+import Admin from "./admin.jsx";
 import { ensureSupabase } from "./supabase.js";
 
 export const AuthContext = createContext(null);
@@ -10,6 +10,13 @@ const fallbackConfig = {
   logo_url: "",
   description: "Update this content from the admin dashboard."
 };
+
+const loginLookupTables = (
+  import.meta.env.VITE_LOGIN_LOOKUP_TABLES || "users,admin_users"
+)
+  .split(",")
+  .map((table) => table.trim())
+  .filter(Boolean);
 
 function LandingPage({ config, configLoading, session }) {
   return (
@@ -125,10 +132,55 @@ function App() {
     };
   }, []);
 
-  const handleLogin = async ({ email, password }) => {
+  const resolveLoginEmail = async (identifier) => {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+
+    if (!normalizedIdentifier) {
+      throw new Error("Username or email is required.");
+    }
+
+    if (normalizedIdentifier.includes("@")) {
+      return normalizedIdentifier;
+    }
+
+    let lastLookupError = null;
+
+    for (const tableName of loginLookupTables) {
+      const { data: account, error: lookupError } = await supabase
+        .from(tableName)
+        .select("email")
+        .eq("username", normalizedIdentifier)
+        .maybeSingle();
+
+      if (lookupError) {
+        if (lookupError.code === "PGRST205" || lookupError.status === 404) {
+          continue;
+        }
+
+        lastLookupError = lookupError;
+        break;
+      }
+
+      if (account?.email) {
+        return account.email;
+      }
+    }
+
+    if (lastLookupError) {
+      throw lastLookupError;
+    }
+
+    throw new Error(
+      `Username login is not configured for the available tables (${loginLookupTables.join(", ")}), or the username was not found. You can also sign in with your email instead.`
+    );
+  };
+
+  const handleLogin = async ({ username, password }) => {
     try {
       setLoginLoading(true);
       setStatusMessage("");
+
+      const email = await resolveLoginEmail(username);
 
       const { error } = await supabase.auth.signInWithPassword({
         email,

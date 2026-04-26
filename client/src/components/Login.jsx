@@ -1,12 +1,12 @@
 import { useState } from "react";
 
 function Login({ onLogin, loading, message }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await onLogin({ email, password });
+    await onLogin({ username, password });
   };
 
   return (
@@ -14,19 +14,19 @@ function Login({ onLogin, loading, message }) {
       <div className="section-heading">
         <p className="eyebrow">Admin Access</p>
         <h2>Log in to manage site content</h2>
-        <p>Use your Supabase Auth email and password.</p>
+        <p>Use your admin username or auth email, plus your password.</p>
       </div>
 
       <form className="stack-form" onSubmit={handleSubmit}>
         <label>
-          <span>Email</span>
+          <span>Username or email</span>
           <input
-            autoComplete="email"
-            name="email"
-            onChange={(event) => setEmail(event.target.value)}
+            autoComplete="username"
+            name="username"
+            onChange={(event) => setUsername(event.target.value)}
             required
-            type="email"
-            value={email}
+            type="text"
+            value={username}
           />
         </label>
 
