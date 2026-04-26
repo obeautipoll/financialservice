@@ -36,6 +36,13 @@ financialservice/
 npm install
 ```
 
+If you want local dependencies for both apps installed explicitly, run:
+
+```bash
+npm run install:client
+npm run install:server
+```
+
 ### Supabase Setup
 
 1. Create a Supabase project.
