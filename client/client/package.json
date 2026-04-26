@@ -1,0 +1,11 @@
+{
+  "name": "supabase-cms-client-nested-build-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "npm run build --prefix .."
+  },
+  "dependencies": {
+    "supabase-cms-client": "file:.."
+  }
+}
