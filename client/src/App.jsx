@@ -208,6 +208,10 @@ function App() {
       });
 
       if (error) {
+        if (error.status === 400) {
+          throw new Error("Invalid login credentials. Check the username mapping and Auth password.");
+        }
+
         throw error;
       }
 
