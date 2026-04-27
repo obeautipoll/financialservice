@@ -1,6 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import Admin from "./admin.jsx";
+import SignUp from "./components/SignUp.jsx";
 import { ensureSupabase, getSupabaseConfigStatus } from "./supabase.js";
 
 export const AuthContext = createContext(null);
@@ -110,6 +111,7 @@ function App() {
   const [config, setConfig] = useState(fallbackConfig);
   const [configLoading, setConfigLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [signUpLoading, setSignUpLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -221,6 +223,50 @@ function App() {
     setStatusMessage("Signed out.");
   };
 
+  const handleSignUp = async ({ username, email, password }) => {
+    try {
+      setSignUpLoading(true);
+      setStatusMessage("");
+
+      const normalizedUsername = username.trim().toLowerCase();
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (!normalizedUsername) {
+        throw new Error("Username is required.");
+      }
+
+      if (!normalizedEmail) {
+        throw new Error("Email is required.");
+      }
+
+      const { error: authError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      const { error: insertError } = await supabase.from("users").insert({
+        email: normalizedEmail,
+        username: normalizedUsername
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      setStatusMessage(
+        "Account created. If email confirmation is enabled in Supabase, confirm your email before signing in."
+      );
+    } catch (error) {
+      setStatusMessage(error.message || "Sign up failed.");
+    } finally {
+      setSignUpLoading(false);
+    }
+  };
+
   const handleSave = async (payload) => {
     try {
       setSaveLoading(true);
@@ -292,6 +338,16 @@ function App() {
               </ProtectedAdminRoute>
             }
             path="/admin"
+          />
+          <Route
+            element={
+              session ? (
+                <Navigate replace to="/admin" />
+              ) : (
+                <SignUp loading={signUpLoading} message={statusMessage} onSignUp={handleSignUp} />
+              )
+            }
+            path="/signup"
           />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>

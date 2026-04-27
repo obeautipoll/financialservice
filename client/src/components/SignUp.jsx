@@ -1,21 +1,22 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-function Login({ onLogin, loading, message }) {
+function SignUp({ loading, message, onSignUp }) {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await onLogin({ username, password });
+    await onSignUp({ email, password, username });
   };
 
   return (
     <section className="card auth-card">
       <div className="section-heading">
-        <p className="eyebrow">Admin Access</p>
-        <h2>Log in to manage site content</h2>
-        <p>Use your username and password.</p>
+        <p className="eyebrow">Admin Sign Up</p>
+        <h2>Create a CMS account</h2>
+        <p>This creates a Supabase Auth user and stores your username mapping in `users`.</p>
       </div>
 
       <form className="stack-form" onSubmit={handleSubmit}>
@@ -32,9 +33,21 @@ function Login({ onLogin, loading, message }) {
         </label>
 
         <label>
+          <span>Email</span>
+          <input
+            autoComplete="email"
+            name="email"
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            type="email"
+            value={email}
+          />
+        </label>
+
+        <label>
           <span>Password</span>
           <input
-            autoComplete="current-password"
+            autoComplete="new-password"
             name="password"
             onChange={(event) => setPassword(event.target.value)}
             required
@@ -44,12 +57,12 @@ function Login({ onLogin, loading, message }) {
         </label>
 
         <button className="primary-button" disabled={loading} type="submit">
-          {loading ? "Signing In..." : "Sign In"}
+          {loading ? "Creating Account..." : "Create Account"}
         </button>
       </form>
 
       <p className="auth-switch">
-        Need an account? <Link to="/signup">Create one</Link>
+        Already have an account? <Link to="/admin">Sign in</Link>
       </p>
 
       {message ? <p className="status-message error">{message}</p> : null}
@@ -57,4 +70,4 @@ function Login({ onLogin, loading, message }) {
   );
 }
 
-export default Login;
+export default SignUp;

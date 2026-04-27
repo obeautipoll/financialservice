@@ -223,6 +223,16 @@ button {
   color: #1e3a8a;
 }
 
+.auth-switch {
+  margin: 16px 0 0;
+  color: #4b5565;
+}
+
+.auth-switch a {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
 .status-message.error {
   color: #b91c1c;
 }
