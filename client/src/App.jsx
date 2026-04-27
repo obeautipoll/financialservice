@@ -1,7 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import Admin from "./admin.jsx";
-import { ensureSupabase } from "./supabase.js";
+import { ensureSupabase, getSupabaseConfigStatus } from "./supabase.js";
 
 export const AuthContext = createContext(null);
 
@@ -67,6 +67,49 @@ function ProtectedAdminRoute({ children, session, config }) {
   }
 
   return <>{children}</>;
+}
+
+function ConfigErrorScreen() {
+  const configStatus = getSupabaseConfigStatus();
+
+  return (
+    <main className="page-shell">
+      <section className="card auth-card">
+        <div className="section-heading">
+          <p className="eyebrow">Configuration Error</p>
+          <h2>Supabase is not configured in this deployment</h2>
+          <p>Add the required Vercel environment variables and redeploy.</p>
+        </div>
+
+        <div className="stack-form">
+          <label>
+            <span>VITE_SUPABASE_URL</span>
+            <input disabled readOnly type="text" value={configStatus.urlConfigured ? "set" : "missing"} />
+          </label>
+
+          <label>
+            <span>VITE_SUPABASE_ANON_KEY</span>
+            <input
+              disabled
+              readOnly
+              type="text"
+              value={configStatus.anonKeyConfigured ? "set" : "missing"}
+            />
+          </label>
+
+          <label>
+            <span>VITE_LOGIN_LOOKUP_TABLES</span>
+            <input
+              disabled
+              readOnly
+              type="text"
+              value={configStatus.lookupTables || "not set"}
+            />
+          </label>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function App() {
@@ -283,4 +326,16 @@ function App() {
   );
 }
 
-export default App;
+function AppRoot() {
+  try {
+    return <App />;
+  } catch (error) {
+    if (error.message?.includes("Supabase is not configured")) {
+      return <ConfigErrorScreen />;
+    }
+
+    throw error;
+  }
+}
+
+export default AppRoot;
