@@ -11,13 +11,6 @@ const fallbackConfig = {
   description: "Update this content from the admin dashboard."
 };
 
-const loginLookupTables = (
-  import.meta.env.VITE_LOGIN_LOOKUP_TABLES || "users,admin_users"
-)
-  .split(",")
-  .map((table) => table.trim())
-  .filter(Boolean);
-
 function LandingPage({ config, configLoading, session }) {
   return (
     <main className="landing-shell">
@@ -175,47 +168,28 @@ function App() {
     };
   }, []);
 
-  const resolveLoginEmail = async (identifier) => {
-    const normalizedIdentifier = identifier.trim().toLowerCase();
+  const resolveLoginEmail = async (username) => {
+    const normalizedUsername = username.trim().toLowerCase();
 
-    if (!normalizedIdentifier) {
-      throw new Error("Username or email is required.");
+    if (!normalizedUsername) {
+      throw new Error("Username is required.");
     }
 
-    if (normalizedIdentifier.includes("@")) {
-      return normalizedIdentifier;
+    const { data, error } = await supabase
+      .from("users")
+      .select("email")
+      .eq("username", normalizedUsername)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
     }
 
-    let lastLookupError = null;
-
-    for (const tableName of loginLookupTables) {
-      const { data: account, error: lookupError } = await supabase
-        .from(tableName)
-        .select("email")
-        .eq("username", normalizedIdentifier)
-        .maybeSingle();
-
-      if (lookupError) {
-        if (lookupError.code === "PGRST205" || lookupError.status === 404) {
-          continue;
-        }
-
-        lastLookupError = lookupError;
-        break;
-      }
-
-      if (account?.email) {
-        return account.email;
-      }
+    if (!data?.email) {
+      throw new Error("Username not found.");
     }
 
-    if (lastLookupError) {
-      throw lastLookupError;
-    }
-
-    throw new Error(
-      `Username login is not configured for the available tables (${loginLookupTables.join(", ")}), or the username was not found. You can also sign in with your email instead.`
-    );
+    return data.email.trim().toLowerCase();
   };
 
   const handleLogin = async ({ username, password }) => {

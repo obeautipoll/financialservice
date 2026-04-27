@@ -14,12 +14,12 @@ function Login({ onLogin, loading, message }) {
       <div className="section-heading">
         <p className="eyebrow">Admin Access</p>
         <h2>Log in to manage site content</h2>
-        <p>Use your admin username or auth email, plus your password.</p>
+        <p>Use your username and password.</p>
       </div>
 
       <form className="stack-form" onSubmit={handleSubmit}>
         <label>
-          <span>Username or email</span>
+          <span>Username</span>
           <input
             autoComplete="username"
             name="username"
