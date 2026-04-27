@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-function SignUp({ loading, message, onSignUp }) {
+function SignUp({ cooldownActive, loading, message, onSignUp }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,8 +56,12 @@ function SignUp({ loading, message, onSignUp }) {
           />
         </label>
 
-        <button className="primary-button" disabled={loading} type="submit">
-          {loading ? "Creating Account..." : "Create Account"}
+        <button className="primary-button" disabled={loading || cooldownActive} type="submit">
+          {loading
+            ? "Creating Account..."
+            : cooldownActive
+              ? "Wait Before Retrying"
+              : "Create Account"}
         </button>
       </form>
 

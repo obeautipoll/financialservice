@@ -112,6 +112,7 @@ function App() {
   const [configLoading, setConfigLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [signUpLoading, setSignUpLoading] = useState(false);
+  const [signUpCooldownUntil, setSignUpCooldownUntil] = useState(0);
   const [saveLoading, setSaveLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -228,6 +229,10 @@ function App() {
       setSignUpLoading(true);
       setStatusMessage("");
 
+      if (Date.now() < signUpCooldownUntil) {
+        throw new Error("Too many signup attempts. Wait a minute, then try again.");
+      }
+
       const normalizedUsername = username.trim().toLowerCase();
       const normalizedEmail = email.trim().toLowerCase();
 
@@ -245,6 +250,17 @@ function App() {
       });
 
       if (authError) {
+        if (authError.status === 429) {
+          setSignUpCooldownUntil(Date.now() + 60 * 1000);
+          throw new Error(
+            "Email rate limit exceeded. Wait at least 1 minute before trying signup again."
+          );
+        }
+
+        if (authError.message?.toLowerCase().includes("user already registered")) {
+          throw new Error("That email is already registered. Try signing in instead.");
+        }
+
         throw authError;
       }
 
@@ -344,7 +360,12 @@ function App() {
               session ? (
                 <Navigate replace to="/admin" />
               ) : (
-                <SignUp loading={signUpLoading} message={statusMessage} onSignUp={handleSignUp} />
+                <SignUp
+                  cooldownActive={Date.now() < signUpCooldownUntil}
+                  loading={signUpLoading}
+                  message={statusMessage}
+                  onSignUp={handleSignUp}
+                />
               )
             }
             path="/signup"
