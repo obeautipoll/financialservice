@@ -111,6 +111,7 @@ function App() {
   const [config, setConfig] = useState(fallbackConfig);
   const [configLoading, setConfigLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [loginResolvedEmail, setLoginResolvedEmail] = useState("");
   const [signUpLoading, setSignUpLoading] = useState(false);
   const [signUpCooldownUntil, setSignUpCooldownUntil] = useState(0);
   const [saveLoading, setSaveLoading] = useState(false);
@@ -199,8 +200,10 @@ function App() {
     try {
       setLoginLoading(true);
       setStatusMessage("");
+      setLoginResolvedEmail("");
 
       const email = await resolveLoginEmail(username);
+      setLoginResolvedEmail(email);
 
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -350,6 +353,7 @@ function App() {
                   loginLoading={loginLoading}
                   onLogin={handleLogin}
                   onLogout={handleLogout}
+                  resolvedEmail={loginResolvedEmail}
                   onSave={handleSave}
                   saveLoading={saveLoading}
                   session={session}

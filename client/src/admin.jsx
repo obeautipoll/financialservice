@@ -6,13 +6,21 @@ function Admin({
   loginLoading,
   onLogin,
   onLogout,
+  resolvedEmail,
   onSave,
   saveLoading,
   session,
   statusMessage
 }) {
   if (!session) {
-    return <Login loading={loginLoading} message={statusMessage} onLogin={onLogin} />;
+    return (
+      <Login
+        loading={loginLoading}
+        message={statusMessage}
+        onLogin={onLogin}
+        resolvedEmail={resolvedEmail}
+      />
+    );
   }
 
   return (

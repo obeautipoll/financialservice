@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
-function Login({ onLogin, loading, message }) {
+function Login({ onLogin, loading, message, resolvedEmail }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -51,6 +51,8 @@ function Login({ onLogin, loading, message }) {
       <p className="auth-switch">
         Need an account? <Link to="/signup">Create one</Link>
       </p>
+
+      {resolvedEmail ? <p className="status-message">Resolved email: {resolvedEmail}</p> : null}
 
       {message ? <p className="status-message error">{message}</p> : null}
     </section>
