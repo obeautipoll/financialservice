@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useState } from "react";
 
 function Login({ onLogin, loading, message, resolvedEmail }) {
@@ -13,14 +12,14 @@ function Login({ onLogin, loading, message, resolvedEmail }) {
   return (
     <section className="card auth-card">
       <div className="section-heading">
-        <p className="eyebrow">Admin Access</p>
-        <h2>Log in to manage site content</h2>
-        <p>Use your username and password.</p>
+        <p className="eyebrow">Secure Access</p>
+        <h2>Log in to update website content</h2>
+        <p>Use your username or Supabase Auth email, plus your password.</p>
       </div>
 
       <form className="stack-form" onSubmit={handleSubmit}>
         <label>
-          <span>Username</span>
+          <span>Username or email</span>
           <input
             autoComplete="username"
             name="username"
@@ -47,10 +46,6 @@ function Login({ onLogin, loading, message, resolvedEmail }) {
           {loading ? "Signing In..." : "Sign In"}
         </button>
       </form>
-
-      <p className="auth-switch">
-        Need an account? <Link to="/signup">Create one</Link>
-      </p>
 
       {resolvedEmail ? <p className="status-message">Resolved email: {resolvedEmail}</p> : null}
 
