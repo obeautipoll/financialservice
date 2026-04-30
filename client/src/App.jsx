@@ -225,6 +225,12 @@ const buildCmsTree = (pages, sections, items) => {
 
 const slugToHref = (slug) => (slug === "home" ? "/" : `/${slug}`);
 
+const cmsSourceLabels = {
+  database: "Supabase",
+  empty: "empty Supabase tables",
+  fallback: "fallback content"
+};
+
 const withTimeout = (promise, ms, message) =>
   Promise.race([
     promise,
@@ -285,6 +291,8 @@ function App() {
   const [session, setSession] = useState(null);
   const [siteSettings, setSiteSettings] = useState(fallbackSiteSettings);
   const [pages, setPages] = useState(fallbackPages);
+  const [cmsDataSource, setCmsDataSource] = useState("fallback");
+  const [cmsError, setCmsError] = useState("");
   const [cmsLoading, setCmsLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginResolvedEmail, setLoginResolvedEmail] = useState("");
@@ -299,7 +307,7 @@ function App() {
     setStatusTone(tone);
   };
 
-  const loadCms = async () => {
+  const loadCms = async ({ throwOnError = false } = {}) => {
     try {
       setCmsLoading(true);
 
@@ -339,13 +347,29 @@ function App() {
 
       if (pageRows?.length) {
         setPages(buildCmsTree(pageRows, sectionRows || [], itemRows || []));
+        setCmsDataSource("database");
+        setCmsError("");
       } else {
         setPages(fallbackPages);
+        setCmsDataSource("empty");
+        const emptyMessage = "Supabase returned no CMS pages. Run supabase/cms_schema.sql so CRUD has real rows to edit.";
+        setCmsError(emptyMessage);
+
+        if (throwOnError) {
+          throw new Error(emptyMessage);
+        }
       }
     } catch (error) {
+      const message = error.message || "Unable to load site content.";
       setSiteSettings(fallbackSiteSettings);
       setPages(fallbackPages);
-      setStatus(error.message || "Unable to load site content.", "error");
+      setCmsDataSource("fallback");
+      setCmsError(message);
+      setStatus(message, "error");
+
+      if (throwOnError) {
+        throw error;
+      }
     } finally {
       setCmsLoading(false);
     }
@@ -355,12 +379,18 @@ function App() {
     let active = true;
 
     const bootstrap = async () => {
-      const {
-        data: { session: currentSession }
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session: currentSession }
+        } = await supabase.auth.getSession();
 
-      if (active) {
-        setSession(currentSession);
+        if (active) {
+          setSession(currentSession);
+        }
+      } catch (error) {
+        if (active) {
+          setStatus(error.message || "Unable to read Supabase auth session.", "error");
+        }
       }
 
       await loadCms();
@@ -370,9 +400,11 @@ function App() {
 
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      await loadCms();
+      window.setTimeout(() => {
+        loadCms();
+      }, 0);
     });
 
     return () => {
@@ -450,12 +482,22 @@ function App() {
     setStatus("Signed out.");
   };
 
+  const assertWritableCms = () => {
+    if (cmsDataSource !== "database") {
+      const label = cmsSourceLabels[cmsDataSource] || cmsDataSource;
+      throw new Error(
+        `Cannot save while the admin is using ${label}. ${cmsError || "Load real Supabase CMS rows first."}`
+      );
+    }
+  };
+
   const saveAndReload = async (callback, successMessage) => {
     try {
       setSaveLoading(true);
       setStatus("", "success");
+      assertWritableCms();
       await callback();
-      await loadCms();
+      await loadCms({ throwOnError: true });
       setStatus(successMessage);
     } catch (error) {
       setStatus(error.message || "Save failed.", "error");
@@ -576,6 +618,7 @@ function App() {
   const handleUploadAsset = async (file, folder) => {
     try {
       setStatus("", "success");
+      assertWritableCms();
       const result = await uploadStorageAsset(file, folder);
       setStatus("Image uploaded.");
       return result.publicUrl;
@@ -664,6 +707,9 @@ function App() {
             element={
               <ProtectedAdminRoute loading={cmsLoading} session={session}>
                 <Admin
+                  cmsDataSource={cmsDataSource}
+                  cmsError={cmsError}
+                  cmsLoading={cmsLoading}
                   loginLoading={loginLoading}
                   onAddItem={handleAddItem}
                   onAddSection={handleAddSection}

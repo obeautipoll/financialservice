@@ -2,6 +2,9 @@ import Login from "./Login.jsx";
 import Dashboard from "./Dashboard.jsx";
 
 function Admin({
+  cmsDataSource,
+  cmsError,
+  cmsLoading,
   loginLoading,
   onAddItem,
   onAddSection,
@@ -45,6 +48,9 @@ function Admin({
       onSaveSection={onSaveSection}
       onSaveSiteSettings={onSaveSiteSettings}
       onUploadAsset={onUploadAsset}
+      cmsDataSource={cmsDataSource}
+      cmsError={cmsError}
+      cmsLoading={cmsLoading}
       pages={pages}
       saveLoading={saveLoading}
       siteSettings={siteSettings}

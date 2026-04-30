@@ -53,8 +53,38 @@ export const uploadStorageAsset = async (file, folder = "uploads") => {
     data: { publicUrl }
   } = client.storage.from(supabaseStorageBucket).getPublicUrl(filePath);
 
+  const assetType = file.type?.startsWith("image/")
+    ? "image"
+    : file.type === "application/pdf"
+      ? "document"
+      : "other";
+
+  const { data: mediaAsset, error: metadataError } = await client
+    .from("media_assets")
+    .insert([
+      {
+        bucket_id: supabaseStorageBucket,
+        object_path: filePath,
+        public_url: publicUrl,
+        file_name: file.name,
+        mime_type: file.type || "",
+        file_size_bytes: file.size,
+        asset_type: assetType,
+        metadata: {
+          folder
+        }
+      }
+    ])
+    .select("*")
+    .maybeSingle();
+
+  if (metadataError) {
+    throw new Error(`File uploaded, but media_assets insert failed: ${metadataError.message}`);
+  }
+
   return {
     filePath,
+    mediaAsset,
     publicUrl
   };
 };

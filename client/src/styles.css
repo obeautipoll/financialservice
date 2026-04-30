@@ -605,6 +605,31 @@ button {
   padding: 24px;
 }
 
+.database-status-banner {
+  margin-bottom: 20px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  padding: 14px 16px;
+}
+
+.database-status-banner.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.database-status-banner strong,
+.database-status-banner span {
+  display: block;
+}
+
+.database-status-banner span {
+  margin-top: 4px;
+  font-size: 0.92rem;
+}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

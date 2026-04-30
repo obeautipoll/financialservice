@@ -339,6 +339,34 @@ function DashboardOverview({ pages }) {
   );
 }
 
+function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading }) {
+  if (cmsLoading) {
+    return (
+      <section className="database-status-banner">
+        <div>
+          <strong>Loading Supabase content</strong>
+          <span>Checking the CMS tables before enabling admin CRUD.</span>
+        </div>
+      </section>
+    );
+  }
+
+  const connected = cmsDataSource === "database";
+
+  return (
+    <section className={`database-status-banner${connected ? "" : " error"}`}>
+      <div>
+        <strong>{connected ? "Connected to Supabase" : "Database content is not loaded"}</strong>
+        <span>
+          {connected
+            ? "Admin CRUD is reading from and writing to the CMS tables."
+            : cmsError || "The dashboard is showing fallback content until Supabase returns real rows."}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 function ItemEditor({ item, onDeleteItem, onSaveItem, onUploadAsset, saveLoading }) {
   const [form, setForm] = useState(itemDefaults);
 
@@ -643,6 +671,9 @@ function SectionEditor({
 }
 
 function Dashboard({
+  cmsDataSource,
+  cmsError,
+  cmsLoading,
   onAddItem,
   onAddSection,
   onDeleteItem,
@@ -808,6 +839,13 @@ function Dashboard({
             >
               <span>Dashboard</span>
             </button>
+            <button
+              className={`sidebar-item${activePanel === "site-settings" ? " active" : ""}`}
+              onClick={() => handleSidebarSelect({ id: "site-settings" })}
+              type="button"
+            >
+              <span>Site Settings</span>
+            </button>
           </div>
 
           {sidebarGroups.map((group) => (
@@ -829,6 +867,8 @@ function Dashboard({
 
         <div className="dashboard-main">
           <div className="dashboard-scroll">
+            <DatabaseStatusBanner cmsDataSource={cmsDataSource} cmsError={cmsError} cmsLoading={cmsLoading} />
+
             {activePanel === "dashboard" ? (
               <DashboardOverview pages={pages} />
             ) : activePanel === "site-settings" ? (
