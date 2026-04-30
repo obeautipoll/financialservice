@@ -11,6 +11,7 @@ function Admin({
   onDeleteItem,
   onDeleteSection,
   onLogout,
+  onRefreshCms,
   onSaveItem,
   onSavePage,
   onSaveSection,
@@ -43,6 +44,7 @@ function Admin({
       onDeleteItem={onDeleteItem}
       onDeleteSection={onDeleteSection}
       onLogout={onLogout}
+      onRefreshCms={onRefreshCms}
       onSaveItem={onSaveItem}
       onSavePage={onSavePage}
       onSaveSection={onSaveSection}

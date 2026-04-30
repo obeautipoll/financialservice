@@ -1,4 +1,4 @@
-import { createContext, useEffect, useMemo, useState } from "react";
+import { createContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Admin from "./admin/Admin.jsx";
 import About from "./landing/About.jsx";
@@ -288,6 +288,7 @@ function ConfigErrorScreen() {
 
 function App() {
   const location = useLocation();
+  const cmsLoadRunId = useRef(0);
   const [session, setSession] = useState(null);
   const [siteSettings, setSiteSettings] = useState(fallbackSiteSettings);
   const [pages, setPages] = useState(fallbackPages);
@@ -308,6 +309,10 @@ function App() {
   };
 
   const loadCms = async ({ throwOnError = false } = {}) => {
+    const runId = cmsLoadRunId.current + 1;
+    cmsLoadRunId.current = runId;
+    const isCurrentRun = () => runId === cmsLoadRunId.current;
+
     try {
       setCmsLoading(true);
 
@@ -339,6 +344,10 @@ function App() {
         throw itemsError;
       }
 
+      if (!isCurrentRun()) {
+        return;
+      }
+
       if (settingsRow) {
         setSiteSettings(settingsRow);
       } else {
@@ -360,6 +369,13 @@ function App() {
         }
       }
     } catch (error) {
+      if (!isCurrentRun()) {
+        if (throwOnError) {
+          throw error;
+        }
+        return;
+      }
+
       const message = error.message || "Unable to load site content.";
       setSiteSettings(fallbackSiteSettings);
       setPages(fallbackPages);
@@ -371,7 +387,9 @@ function App() {
         throw error;
       }
     } finally {
-      setCmsLoading(false);
+      if (isCurrentRun()) {
+        setCmsLoading(false);
+      }
     }
   };
 
@@ -480,6 +498,11 @@ function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setStatus("Signed out.");
+  };
+
+  const handleRefreshCms = async () => {
+    setStatus("", "success");
+    await loadCms();
   };
 
   const assertWritableCms = () => {
@@ -717,6 +740,7 @@ function App() {
                   onDeleteSection={handleDeleteSection}
                   onLogin={handleLogin}
                   onLogout={handleLogout}
+                  onRefreshCms={handleRefreshCms}
                   onSaveItem={handleSaveItem}
                   onSavePage={handleSavePage}
                   onSaveSection={handleSaveSection}

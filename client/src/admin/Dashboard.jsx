@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 const siteDefaults = {
   site_name: "",
@@ -52,6 +53,8 @@ const itemDefaults = {
   sort_order: 0,
   is_active: true
 };
+
+const slugToHref = (slug) => (slug === "home" ? "/" : `/${slug}`);
 
 const sidebarGroups = [
   {
@@ -339,7 +342,7 @@ function DashboardOverview({ pages }) {
   );
 }
 
-function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading }) {
+function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading, onRefreshCms }) {
   if (cmsLoading) {
     return (
       <section className="database-status-banner">
@@ -347,6 +350,9 @@ function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading }) {
           <strong>Loading Supabase content</strong>
           <span>Checking the CMS tables before enabling admin CRUD.</span>
         </div>
+        <button className="secondary-button" disabled type="button">
+          Refreshing...
+        </button>
       </section>
     );
   }
@@ -362,6 +368,41 @@ function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading }) {
             ? "Admin CRUD is reading from and writing to the CMS tables."
             : cmsError || "The dashboard is showing fallback content until Supabase returns real rows."}
         </span>
+      </div>
+      <button className="secondary-button" onClick={onRefreshCms} type="button">
+        Refresh Content
+      </button>
+    </section>
+  );
+}
+
+function LandingConnectionPanel({ page }) {
+  const activeSections = (page.sections || []).filter((section) => section.is_active);
+  const activeItems = activeSections.reduce(
+    (total, section) => total + (section.items || []).filter((item) => item.is_active).length,
+    0
+  );
+  const href = slugToHref(page.slug);
+
+  return (
+    <section className="card landing-connection-panel">
+      <div>
+        <p className="eyebrow">Landing Page</p>
+        <h3>{href}</h3>
+        <p>
+          {page.is_published
+            ? `${activeSections.length} active sections and ${activeItems} active items are available to render.`
+            : "This page is saved as a draft, so public visitors will not see it."}
+        </p>
+      </div>
+
+      <div className="landing-connection-actions">
+        <span className={`publish-pill${page.is_published ? "" : " draft"}`}>
+          {page.is_published ? "Published" : "Draft"}
+        </span>
+        <Link className="secondary-button" to={href}>
+          Open Landing Page
+        </Link>
       </div>
     </section>
   );
@@ -679,6 +720,7 @@ function Dashboard({
   onDeleteItem,
   onDeleteSection,
   onLogout,
+  onRefreshCms,
   onSaveItem,
   onSavePage,
   onSaveSection,
@@ -867,7 +909,12 @@ function Dashboard({
 
         <div className="dashboard-main">
           <div className="dashboard-scroll">
-            <DatabaseStatusBanner cmsDataSource={cmsDataSource} cmsError={cmsError} cmsLoading={cmsLoading} />
+            <DatabaseStatusBanner
+              cmsDataSource={cmsDataSource}
+              cmsError={cmsError}
+              cmsLoading={cmsLoading}
+              onRefreshCms={onRefreshCms}
+            />
 
             {activePanel === "dashboard" ? (
               <DashboardOverview pages={pages} />
@@ -882,6 +929,8 @@ function Dashboard({
             ) : null}
             {activePanel !== "dashboard" && activePanel !== "site-settings" && selectedPage ? (
               <div className="dashboard-stack">
+                <LandingConnectionPanel page={selectedPage} />
+
                 <div className="card stack-form">
                   <div className="section-heading">
                     <h3>Page Editor</h3>
