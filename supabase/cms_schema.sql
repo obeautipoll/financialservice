@@ -122,6 +122,141 @@ create table if not exists public.users (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+-- Uploaded image/document files live in Supabase Storage. Content tables store
+-- public URLs as text so pages can render them directly.
+insert into storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+values (
+  'site-assets',
+  'site-assets',
+  true,
+  10485760,
+  array[
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/svg+xml',
+    'application/pdf'
+  ]
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+create table if not exists public.media_assets (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text not null default 'site-assets',
+  object_path text not null,
+  public_url text not null default '',
+  file_name text not null default '',
+  mime_type text not null default '',
+  file_size_bytes bigint,
+  asset_type text not null default 'image' check (asset_type in ('image', 'document', 'other')),
+  alt_text text default '',
+  caption text default '',
+  uploaded_by uuid references auth.users(id) on delete set null default auth.uid(),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint media_assets_bucket_path_unique unique (bucket_id, object_path)
+);
+
+create table if not exists public.contact_leads (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  email text not null,
+  phone text default '',
+  preferred_contact_method text default '',
+  subject text default '',
+  message text default '',
+  source_page text default 'contact',
+  status text not null default 'new' check (status in ('new', 'contacted', 'qualified', 'closed', 'spam')),
+  assigned_to uuid references public.users(id) on delete set null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.assessment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references public.contact_leads(id) on delete set null,
+  full_name text not null default '',
+  email text not null default '',
+  phone text default '',
+  goals text[] not null default '{}'::text[],
+  answers jsonb not null default '{}'::jsonb,
+  result_summary text default '',
+  recommendation text default '',
+  status text not null default 'new' check (status in ('new', 'reviewed', 'follow_up', 'closed')),
+  assigned_to uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.consultations (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid references public.contact_leads(id) on delete set null,
+  assessment_submission_id uuid references public.assessment_submissions(id) on delete set null,
+  scheduled_at timestamptz,
+  timezone text default 'UTC',
+  meeting_type text not null default 'phone' check (meeting_type in ('phone', 'video', 'in_person', 'other')),
+  location_or_link text default '',
+  status text not null default 'requested' check (status in ('requested', 'scheduled', 'completed', 'cancelled', 'no_show')),
+  notes text default '',
+  advisor_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.team_applications (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  email text not null,
+  phone text default '',
+  location text default '',
+  experience_level text default '',
+  resume_url text default '',
+  portfolio_url text default '',
+  message text default '',
+  status text not null default 'new' check (status in ('new', 'reviewing', 'interview', 'accepted', 'declined')),
+  reviewed_by uuid references public.users(id) on delete set null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.advisor_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references public.users(id) on delete set null,
+  display_name text not null,
+  title text default '',
+  bio text default '',
+  headshot_url text default '',
+  email text default '',
+  phone text default '',
+  license_text text default '',
+  specialties text[] not null default '{}'::text[],
+  sort_order integer not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists idx_media_assets_bucket_path on public.media_assets(bucket_id, object_path);
+create index if not exists idx_contact_leads_status_created_at on public.contact_leads(status, created_at desc);
+create index if not exists idx_assessment_submissions_status_created_at on public.assessment_submissions(status, created_at desc);
+create index if not exists idx_consultations_status_scheduled_at on public.consultations(status, scheduled_at);
+create index if not exists idx_team_applications_status_created_at on public.team_applications(status, created_at desc);
+create index if not exists idx_advisor_profiles_active_order on public.advisor_profiles(is_active, sort_order);
+
 create or replace function public.is_cms_editor()
 returns boolean
 language sql
@@ -165,11 +300,78 @@ before update on public.users
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists trg_media_assets_updated_at on public.media_assets;
+create trigger trg_media_assets_updated_at
+before update on public.media_assets
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_contact_leads_updated_at on public.contact_leads;
+create trigger trg_contact_leads_updated_at
+before update on public.contact_leads
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_assessment_submissions_updated_at on public.assessment_submissions;
+create trigger trg_assessment_submissions_updated_at
+before update on public.assessment_submissions
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_consultations_updated_at on public.consultations;
+create trigger trg_consultations_updated_at
+before update on public.consultations
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_team_applications_updated_at on public.team_applications;
+create trigger trg_team_applications_updated_at
+before update on public.team_applications
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_advisor_profiles_updated_at on public.advisor_profiles;
+create trigger trg_advisor_profiles_updated_at
+before update on public.advisor_profiles
+for each row
+execute function public.set_updated_at();
+
 alter table public.site_settings enable row level security;
 alter table public.cms_pages enable row level security;
 alter table public.cms_sections enable row level security;
 alter table public.cms_section_items enable row level security;
 alter table public.users enable row level security;
+alter table public.media_assets enable row level security;
+alter table public.contact_leads enable row level security;
+alter table public.assessment_submissions enable row level security;
+alter table public.consultations enable row level security;
+alter table public.team_applications enable row level security;
+alter table public.advisor_profiles enable row level security;
+
+drop policy if exists "Public can read site assets" on storage.objects;
+create policy "Public can read site assets"
+on storage.objects
+for select
+using (bucket_id = 'site-assets');
+
+drop policy if exists "Editors can upload site assets" on storage.objects;
+create policy "Editors can upload site assets"
+on storage.objects
+for insert
+with check (bucket_id = 'site-assets' and public.is_cms_editor());
+
+drop policy if exists "Editors can update site assets" on storage.objects;
+create policy "Editors can update site assets"
+on storage.objects
+for update
+using (bucket_id = 'site-assets' and public.is_cms_editor())
+with check (bucket_id = 'site-assets' and public.is_cms_editor());
+
+drop policy if exists "Editors can delete site assets" on storage.objects;
+create policy "Editors can delete site assets"
+on storage.objects
+for delete
+using (bucket_id = 'site-assets' and public.is_cms_editor());
 
 drop policy if exists "Public can read site settings" on public.site_settings;
 create policy "Public can read site settings"
@@ -249,6 +451,12 @@ on public.users
 for select
 using (auth.uid() = id);
 
+drop policy if exists "Public can resolve login usernames" on public.users;
+create policy "Public can resolve login usernames"
+on public.users
+for select
+using (true);
+
 drop policy if exists "Editors can read all CMS users" on public.users;
 create policy "Editors can read all CMS users"
 on public.users
@@ -258,6 +466,88 @@ using (public.is_cms_editor());
 drop policy if exists "Editors can manage CMS users" on public.users;
 create policy "Editors can manage CMS users"
 on public.users
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can read media assets" on public.media_assets;
+create policy "Public can read media assets"
+on public.media_assets
+for select
+using (true);
+
+drop policy if exists "Editors can manage media assets" on public.media_assets;
+create policy "Editors can manage media assets"
+on public.media_assets
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can create contact leads" on public.contact_leads;
+create policy "Public can create contact leads"
+on public.contact_leads
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "Editors can manage contact leads" on public.contact_leads;
+create policy "Editors can manage contact leads"
+on public.contact_leads
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can create assessment submissions" on public.assessment_submissions;
+create policy "Public can create assessment submissions"
+on public.assessment_submissions
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "Editors can manage assessment submissions" on public.assessment_submissions;
+create policy "Editors can manage assessment submissions"
+on public.assessment_submissions
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can request consultations" on public.consultations;
+create policy "Public can request consultations"
+on public.consultations
+for insert
+to anon, authenticated
+with check (status = 'requested' and advisor_id is null);
+
+drop policy if exists "Editors can manage consultations" on public.consultations;
+create policy "Editors can manage consultations"
+on public.consultations
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can create team applications" on public.team_applications;
+create policy "Public can create team applications"
+on public.team_applications
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "Editors can manage team applications" on public.team_applications;
+create policy "Editors can manage team applications"
+on public.team_applications
+for all
+using (public.is_cms_editor())
+with check (public.is_cms_editor());
+
+drop policy if exists "Public can read active advisor profiles" on public.advisor_profiles;
+create policy "Public can read active advisor profiles"
+on public.advisor_profiles
+for select
+using (is_active = true or public.is_cms_editor());
+
+drop policy if exists "Editors can manage advisor profiles" on public.advisor_profiles;
+create policy "Editors can manage advisor profiles"
+on public.advisor_profiles
 for all
 using (public.is_cms_editor())
 with check (public.is_cms_editor());
