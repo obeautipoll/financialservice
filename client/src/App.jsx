@@ -223,6 +223,19 @@ const buildCmsTree = (pages, sections, items) => {
     .sort(sortByOrder);
 };
 
+const buildPublishedCmsTree = (pages) =>
+  pages
+    .filter((page) => page.is_published)
+    .map((page) => ({
+      ...page,
+      sections: (page.sections || [])
+        .filter((section) => section.is_active)
+        .map((section) => ({
+          ...section,
+          items: (section.items || []).filter((item) => item.is_active)
+        }))
+    }));
+
 const slugToHref = (slug) => (slug === "home" ? "/" : `/${slug}`);
 
 const cmsSourceLabels = {
@@ -280,6 +293,20 @@ function ConfigErrorScreen() {
               value={configStatus.lookupTables || "not set"}
             />
           </label>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function ContentUnavailableScreen({ message }) {
+  return (
+    <main className="landing-shell">
+      <section className="content-section">
+        <div className="section-heading">
+          <p className="eyebrow">Content unavailable</p>
+          <h2>Landing page content is not loaded from Supabase</h2>
+          <p>{message}</p>
         </div>
       </section>
     </main>
@@ -652,9 +679,32 @@ function App() {
   };
 
   const authValue = useMemo(() => ({ session, setSession }), [session]);
-  const navPages = pages.filter((page) => page.is_published || session);
-  const findPageBySlug = (slug) => pages.find((page) => page.slug === slug) || null;
+  const landingPages = useMemo(
+    () => (cmsDataSource === "database" ? buildPublishedCmsTree(pages) : []),
+    [cmsDataSource, pages]
+  );
+  const landingContentError =
+    !cmsLoading && cmsDataSource !== "database"
+      ? cmsError || "Supabase did not return CMS content."
+      : !cmsLoading && !landingPages.length
+        ? "Supabase returned CMS rows, but no landing pages are published."
+        : "";
+  const navPages = landingPages;
+  const findLandingPageBySlug = (slug) => landingPages.find((page) => page.slug === slug) || null;
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const renderLandingPage = (PageComponent, slug, useFirstPage = false) => {
+    if (landingContentError) {
+      return <ContentUnavailableScreen message={landingContentError} />;
+    }
+
+    return (
+      <PageComponent
+        page={findLandingPageBySlug(slug) || (useFirstPage ? landingPages[0] : null)}
+        pagesLoading={cmsLoading}
+        siteSettings={siteSettings}
+      />
+    );
+  };
 
   return (
     <AuthContext.Provider value={authValue}>
@@ -685,45 +735,31 @@ function App() {
         ) : null}
         <Routes>
           <Route
-            element={
-              <Home page={findPageBySlug("home") || pages[0] || null} pagesLoading={cmsLoading} siteSettings={siteSettings} />
-            }
+            element={renderLandingPage(Home, "home", true)}
             path="/"
           />
           <Route
-            element={<About page={findPageBySlug("about-us")} pagesLoading={cmsLoading} siteSettings={siteSettings} />}
+            element={renderLandingPage(About, "about-us")}
             path="/about-us"
           />
           <Route
-            element={<Services page={findPageBySlug("services")} pagesLoading={cmsLoading} siteSettings={siteSettings} />}
+            element={renderLandingPage(Services, "services")}
             path="/services"
           />
           <Route
-            element={
-              <FreeAssessment
-                page={findPageBySlug("free-assessment")}
-                pagesLoading={cmsLoading}
-                siteSettings={siteSettings}
-              />
-            }
+            element={renderLandingPage(FreeAssessment, "free-assessment")}
             path="/free-assessment"
           />
           <Route
-            element={<Resources page={findPageBySlug("resources")} pagesLoading={cmsLoading} siteSettings={siteSettings} />}
+            element={renderLandingPage(Resources, "resources")}
             path="/resources"
           />
           <Route
-            element={
-              <JoinOurTeam
-                page={findPageBySlug("join-our-team")}
-                pagesLoading={cmsLoading}
-                siteSettings={siteSettings}
-              />
-            }
+            element={renderLandingPage(JoinOurTeam, "join-our-team")}
             path="/join-our-team"
           />
           <Route
-            element={<Contact page={findPageBySlug("contact")} pagesLoading={cmsLoading} siteSettings={siteSettings} />}
+            element={renderLandingPage(Contact, "contact")}
             path="/contact"
           />
           <Route
