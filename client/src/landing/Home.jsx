@@ -1,12 +1,96 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   FooterCallout,
   LinkButton,
-  PageHero,
   SectionRenderer,
   findSection,
   getActiveItems,
   renderPageState
 } from "./ManagedPage.jsx";
+
+const splitHeroImageList = (imageList) =>
+  String(imageList || "")
+    .split(/\s*(?:\r?\n|\|)\s*/)
+    .map((imageUrl) => imageUrl.trim())
+    .filter(Boolean);
+
+const getHomeHeroImages = (page) => {
+  const seen = new Set();
+
+  return splitHeroImageList(page.hero_image_url).filter((imageUrl) => {
+    if (seen.has(imageUrl)) {
+      return false;
+    }
+
+    seen.add(imageUrl);
+    return true;
+  });
+};
+
+const formatHomeHeroButtonLabel = (label) => {
+  const trimmedLabel = String(label || "").trim();
+
+  if (!trimmedLabel || (trimmedLabel.startsWith("[") && trimmedLabel.endsWith("]"))) {
+    return trimmedLabel;
+  }
+
+  return `[${trimmedLabel}]`;
+};
+
+function HomeHero({ page }) {
+  const heroImages = useMemo(() => getHomeHeroImages(page), [page]);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    setActiveSlide(0);
+  }, [heroImages]);
+
+  useEffect(() => {
+    if (heroImages.length <= 1) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActiveSlide((currentSlide) => (currentSlide + 1) % heroImages.length);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [heroImages.length]);
+
+  return (
+    <section className="home-hero" aria-label={page.hero_title || page.page_title}>
+      <div className="home-hero-slideshow" aria-hidden="true">
+        {heroImages.map((imageUrl, index) => (
+          <img
+            alt=""
+            className={`home-hero-slide${index === activeSlide ? " active" : ""}`}
+            key={imageUrl}
+            src={imageUrl}
+          />
+        ))}
+      </div>
+
+      <div className="home-hero-copy">
+        <h1>{page.hero_title || page.page_title}</h1>
+        <p>{page.hero_body || page.page_description}</p>
+
+        <div className="button-row">
+          {page.hero_primary_button_label && page.hero_primary_button_url ? (
+            <LinkButton to={page.hero_primary_button_url}>
+              {formatHomeHeroButtonLabel(page.hero_primary_button_label)}
+            </LinkButton>
+          ) : null}
+
+          {page.hero_secondary_button_label && page.hero_secondary_button_url ? (
+            <LinkButton className="secondary-button" to={page.hero_secondary_button_url}>
+              {formatHomeHeroButtonLabel(page.hero_secondary_button_label)}
+            </LinkButton>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function Home({ page, pagesLoading, siteSettings }) {
   const state = renderPageState(page, pagesLoading);
@@ -23,7 +107,7 @@ function Home({ page, pagesLoading, siteSettings }) {
 
   return (
     <main className="landing-shell landing-page home-page">
-      <PageHero page={page} siteSettings={siteSettings} />
+      {page.hero_visible === false ? null : <HomeHero page={page} />}
 
       {whoWeHelp ? (
         <section className="content-section split-section">

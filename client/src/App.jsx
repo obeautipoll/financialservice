@@ -3,11 +3,12 @@ import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Admin from "./admin/Admin.jsx";
 import About from "./landing/About.jsx";
 import Contact from "./landing/Contact.jsx";
-import FreeAssessment from "./landing/FreeAssessment.jsx";
 import Home from "./landing/Home.jsx";
+import InsuranceProducts from "./landing/InsuranceProducts.jsx";
 import JoinOurTeam from "./landing/JoinOurTeam.jsx";
+import { SiteFooter } from "./landing/ManagedPage.jsx";
 import Resources from "./landing/Resources.jsx";
-import Services from "./landing/Services.jsx";
+import { getPublicNavLabel, slugToHref } from "./pageDefinitions.js";
 import { ensureSupabase, getSupabaseConfigStatus, uploadStorageAsset } from "./supabase.js";
 
 export const AuthContext = createContext(null);
@@ -15,11 +16,19 @@ export const AuthContext = createContext(null);
 const fallbackSiteSettings = {
   site_name: "Financial Services",
   logo_url: "",
+  footer_cta_visible: true,
   footer_cta_title: "Ready to take the next step?",
   footer_cta_body:
     "Book a free consultation today and let our team help you create a financial protection plan.",
   footer_cta_button_label: "Book a Free Consultation",
-  footer_cta_button_url: "/contact"
+  footer_cta_button_url: "/contact",
+  office_location_title: "Office Location",
+  office_location_address: "",
+  contact_phone: "",
+  contact_email: "",
+  social_links: [],
+  footer_quicklinks_visible: true,
+  copyright_name: "ZPG Eagle Financial Team"
 };
 
 const fallbackPages = [
@@ -35,9 +44,10 @@ const fallbackPages = [
       "We help individuals, families, and professionals understand their insurance options, protect their income, and build a better financial future.",
     hero_primary_button_label: "Book a Free Financial Review",
     hero_primary_button_url: "/contact",
-    hero_secondary_button_label: "Start Free Assessment",
-    hero_secondary_button_url: "/free-assessment",
+    hero_secondary_button_label: "Talk to Our Team",
+    hero_secondary_button_url: "/contact",
     hero_image_url: "",
+    hero_visible: true,
     is_published: true,
     sort_order: 1,
     sections: [
@@ -236,13 +246,36 @@ const buildPublishedCmsTree = (pages) =>
         }))
     }));
 
-const slugToHref = (slug) => (slug === "home" ? "/" : `/${slug}`);
-
 const cmsSourceLabels = {
   database: "Supabase",
   empty: "empty Supabase tables",
   fallback: "fallback content"
 };
+
+const isRemovedCmsPage = (page) => page?.slug === "free-assessment";
+
+const normalizeSocialLinks = (socialLinks) => {
+  if (Array.isArray(socialLinks)) {
+    return socialLinks;
+  }
+
+  if (typeof socialLinks === "string" && socialLinks.trim()) {
+    try {
+      const parsedLinks = JSON.parse(socialLinks);
+      return Array.isArray(parsedLinks) ? parsedLinks : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const normalizeSiteSettings = (settingsRow) => ({
+  ...fallbackSiteSettings,
+  ...(settingsRow || {}),
+  social_links: normalizeSocialLinks(settingsRow?.social_links)
+});
 
 const withTimeout = (promise, ms, message) =>
   Promise.race([
@@ -376,7 +409,7 @@ function App() {
       }
 
       if (settingsRow) {
-        setSiteSettings(settingsRow);
+        setSiteSettings(normalizeSiteSettings(settingsRow));
       } else {
         setSiteSettings(fallbackSiteSettings);
       }
@@ -594,20 +627,27 @@ function App() {
     }, "Section saved.");
   };
 
-  const handleAddSection = async (pageId) => {
-    const sectionKey = `section-${Date.now()}`;
+  const handleAddSection = async (pageId, payload = {}) => {
+    const sectionKey = payload.section_key || `section-${Date.now()}`;
+    const sortOrder = Number(payload.sort_order) || 0;
 
     await saveAndReload(async () => {
       const { error } = await supabase.from("cms_sections").insert([
         {
           page_id: pageId,
           section_key: sectionKey,
-          section_label: "New Section",
-          section_type: "content",
-          title: "New Section",
-          body: "Add content here.",
-          sort_order: Date.now(),
-          is_active: true
+          section_label: payload.section_label || "New Section",
+          section_type: payload.section_type || "cards",
+          title: payload.title || "New Section",
+          subtitle: payload.subtitle || "",
+          body: payload.body || "Add content here.",
+          image_url: payload.image_url || "",
+          primary_button_label: payload.primary_button_label || "",
+          primary_button_url: payload.primary_button_url || "",
+          secondary_button_label: payload.secondary_button_label || "",
+          secondary_button_url: payload.secondary_button_url || "",
+          sort_order: sortOrder,
+          is_active: payload.is_active ?? true
         }
       ]);
 
@@ -637,15 +677,19 @@ function App() {
     }, "Section item saved.");
   };
 
-  const handleAddItem = async (sectionId) => {
+  const handleAddItem = async (sectionId, payload = {}) => {
     await saveAndReload(async () => {
       const { error } = await supabase.from("cms_section_items").insert([
         {
           section_id: sectionId,
-          title: "New Item",
-          body: "Add item content here.",
-          sort_order: Date.now(),
-          is_active: true
+          title: payload.title || "New Card",
+          subtitle: payload.subtitle || "",
+          body: payload.body || "Add a short description here.",
+          image_url: payload.image_url || "",
+          link_label: payload.link_label || "",
+          link_url: payload.link_url || "",
+          sort_order: Number(payload.sort_order) || 0,
+          is_active: payload.is_active ?? true
         }
       ]);
 
@@ -678,10 +722,75 @@ function App() {
     }
   };
 
+  const handleSubmitContactLead = async ({ full_name, phone }) => {
+    const trimmedName = String(full_name || "").trim();
+    const trimmedPhone = String(phone || "").trim();
+
+    if (!trimmedName) {
+      throw new Error("Name is required.");
+    }
+
+    if (!trimmedPhone) {
+      throw new Error("Number is required.");
+    }
+
+    const { error } = await supabase.from("contact_leads").insert([
+      {
+        full_name: trimmedName,
+        email: "",
+        phone: trimmedPhone,
+        preferred_contact_method: "phone",
+        subject: "Name and number contact form",
+        message: "",
+        source_page: "contact",
+        status: "new"
+      }
+    ]);
+
+    if (error) {
+      throw error;
+    }
+  };
+
+  const handleSubmitTeamApplication = async (payload) => {
+    const fullName = String(payload.full_name || "").trim();
+    const email = String(payload.email || "").trim();
+    const phone = String(payload.phone || "").trim();
+
+    if (!fullName) {
+      throw new Error("Name is required.");
+    }
+
+    if (!email) {
+      throw new Error("Email is required.");
+    }
+
+    if (!phone) {
+      throw new Error("Number is required.");
+    }
+
+    const { error } = await supabase.from("team_applications").insert([
+      {
+        full_name: fullName,
+        email,
+        phone,
+        location: String(payload.location || "").trim(),
+        experience_level: String(payload.experience_level || "").trim(),
+        message: String(payload.message || "").trim(),
+        status: "new"
+      }
+    ]);
+
+    if (error) {
+      throw error;
+    }
+  };
+
   const authValue = useMemo(() => ({ session, setSession }), [session]);
+  const managedPages = useMemo(() => pages.filter((page) => !isRemovedCmsPage(page)), [pages]);
   const landingPages = useMemo(
-    () => (cmsDataSource === "database" ? buildPublishedCmsTree(pages) : []),
-    [cmsDataSource, pages]
+    () => (cmsDataSource === "database" ? buildPublishedCmsTree(managedPages) : []),
+    [cmsDataSource, managedPages]
   );
   const landingContentError =
     !cmsLoading && cmsDataSource !== "database"
@@ -689,7 +798,7 @@ function App() {
       : !cmsLoading && !landingPages.length
         ? "Supabase returned CMS rows, but no landing pages are published."
         : "";
-  const navPages = landingPages;
+  const navPages = landingPages.filter((page) => page.slug !== "home");
   const findLandingPageBySlug = (slug) => landingPages.find((page) => page.slug === slug) || null;
   const isAdminRoute = location.pathname.startsWith("/admin");
   const renderLandingPage = (PageComponent, slug, useFirstPage = false) => {
@@ -705,6 +814,30 @@ function App() {
       />
     );
   };
+  const renderContactPage = () => {
+    if (landingContentError) {
+      return <ContentUnavailableScreen message={landingContentError} />;
+    }
+
+    return (
+      <Contact
+        onSubmitContactLead={handleSubmitContactLead}
+        page={findLandingPageBySlug("contact")}
+        pagesLoading={cmsLoading}
+        siteSettings={siteSettings}
+      />
+    );
+  };
+  const getAboutTeamMembers = () => {
+    const aboutPage = findLandingPageBySlug("about-us");
+    const teamSection = (aboutPage?.sections || []).find(
+      (section) =>
+        section.section_type === "cards" &&
+        /team|member/i.test(`${section.section_key} ${section.section_label} ${section.title}`)
+    );
+
+    return (teamSection?.items || []).filter((item) => item.is_active !== false);
+  };
 
   return (
     <AuthContext.Provider value={authValue}>
@@ -713,15 +846,14 @@ function App() {
           <header className="site-header">
             <Link className="header-logo" to="/">
               {siteSettings.logo_url ? (
-                <img alt={siteSettings.site_name} src={siteSettings.logo_url} />
-              ) : (
-                <span>{siteSettings.site_name}</span>
-              )}
+                <img alt="" aria-hidden="true" src={siteSettings.logo_url} />
+              ) : null}
+              <span className="header-logo-name">{siteSettings.site_name}</span>
             </Link>
             <nav className="site-nav">
               {navPages.map((page) => (
                 <Link key={page.id} to={slugToHref(page.slug)}>
-                  {page.nav_label}
+                  {getPublicNavLabel(page)}
                 </Link>
               ))}
             </nav>
@@ -743,23 +875,31 @@ function App() {
             path="/about-us"
           />
           <Route
-            element={renderLandingPage(Services, "services")}
+            element={renderLandingPage(InsuranceProducts, "services")}
             path="/services"
-          />
-          <Route
-            element={renderLandingPage(FreeAssessment, "free-assessment")}
-            path="/free-assessment"
           />
           <Route
             element={renderLandingPage(Resources, "resources")}
             path="/resources"
           />
           <Route
-            element={renderLandingPage(JoinOurTeam, "join-our-team")}
+            element={
+              landingContentError ? (
+                <ContentUnavailableScreen message={landingContentError} />
+              ) : (
+                <JoinOurTeam
+                  onSubmitTeamApplication={handleSubmitTeamApplication}
+                  page={findLandingPageBySlug("join-our-team")}
+                  pagesLoading={cmsLoading}
+                  siteSettings={siteSettings}
+                  teamMembers={getAboutTeamMembers()}
+                />
+              )
+            }
             path="/join-our-team"
           />
           <Route
-            element={renderLandingPage(Contact, "contact")}
+            element={renderContactPage()}
             path="/contact"
           />
           <Route
@@ -782,7 +922,7 @@ function App() {
                   onSaveSection={handleSaveSection}
                   onSaveSiteSettings={handleSaveSiteSettings}
                   onUploadAsset={handleUploadAsset}
-                  pages={pages}
+                  pages={managedPages}
                   resolvedEmail={loginResolvedEmail}
                   saveLoading={saveLoading}
                   session={session}
@@ -792,10 +932,11 @@ function App() {
                 />
               </ProtectedAdminRoute>
             }
-            path="/admin"
+            path="/admin/*"
           />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Routes>
+        {!isAdminRoute ? <SiteFooter pages={landingPages} siteSettings={siteSettings} /> : null}
       </div>
     </AuthContext.Provider>
   );

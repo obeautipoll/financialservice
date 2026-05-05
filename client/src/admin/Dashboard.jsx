@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-
-const siteDefaults = {
-  site_name: "",
-  logo_url: "",
-  footer_cta_title: "",
-  footer_cta_body: "",
-  footer_cta_button_label: "",
-  footer_cta_button_url: ""
-};
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  getAdminPageDefinitionByPanelId,
+  getAdminPageDefinitionBySlug,
+  landingPageDefinitions
+} from "../pageDefinitions.js";
+import PageEditorPanel from "./PageEditorPanel.jsx";
+import ContactLeads from "./ContactLeads.jsx";
+import SiteInformation from "./SiteInformation.jsx";
+import TeamApplications from "./TeamApplications.jsx";
 
 const pageDefaults = {
   nav_label: "",
@@ -23,187 +23,51 @@ const pageDefaults = {
   hero_secondary_button_label: "",
   hero_secondary_button_url: "",
   hero_image_url: "",
+  hero_visible: true,
   sort_order: 0,
   is_published: true
 };
 
-const sectionDefaults = {
-  section_key: "",
-  section_label: "",
-  section_type: "content",
-  title: "",
-  subtitle: "",
-  body: "",
-  image_url: "",
-  primary_button_label: "",
-  primary_button_url: "",
-  secondary_button_label: "",
-  secondary_button_url: "",
-  sort_order: 0,
-  is_active: true
-};
-
-const itemDefaults = {
-  title: "",
-  subtitle: "",
-  body: "",
-  image_url: "",
-  link_label: "",
-  link_url: "",
-  sort_order: 0,
-  is_active: true
-};
-
-const slugToHref = (slug) => (slug === "home" ? "/" : `/${slug}`);
+const websiteContentItems = landingPageDefinitions.map((pageDefinition) => ({
+  id: pageDefinition.adminPanelId,
+  label: pageDefinition.adminLabel,
+  helper: pageDefinition.slug,
+  type: "page",
+  path: pageDefinition.adminPath
+}));
 
 const sidebarGroups = [
   {
+    id: "website-content",
     title: "Website Content",
+    items: websiteContentItems
+  },
+  {
+    id: "leads-assessment",
+    title: "Contact Requests",
     items: [
-      { id: "home", label: "Hero Section", helper: "home" },
-      { id: "home-who-we-help", label: "Who We Help", helper: "home" },
-      { id: "services", label: "Services Overview", helper: "services" },
-      { id: "about-us", label: "Why Choose Us", helper: "about-us" },
-      { id: "resources", label: "Resources", helper: "resources" },
-      { id: "join-our-team", label: "Join Our Team", helper: "join-our-team" },
-      { id: "contact", label: "Contact Us", helper: "contact" }
+      { id: "leads-contact", label: "Name and Number", type: "module" },
+      { id: "new-leads", label: "New Leads", type: "module" },
+      { id: "assessment-results", label: "Assessment Results", type: "module" },
+      { id: "consultations", label: "Consultations", type: "module" }
     ]
   },
   {
-    title: "Leads & Assessment",
+    id: "recruitment",
+    title: "Join Our Team",
     items: [
-      { id: "placeholder-new-leads", label: "New Leads", disabled: true },
-      { id: "placeholder-results", label: "Assessment Results", disabled: true },
-      { id: "placeholder-consultations", label: "Consultations", disabled: true }
-    ]
-  },
-  {
-    title: "Recruitment",
-    items: [
-      { id: "placeholder-team-applications", label: "Team Applications", disabled: true },
-      { id: "placeholder-advisor-profiles", label: "Advisor Profiles", disabled: true }
+      { id: "team-applications", label: "Applications", type: "module" }
     ]
   }
 ];
 
-function ImageField({ folder, label, name, onChange, onUploadAsset, value }) {
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-
-  const handleUpload = async () => {
-    if (!file) {
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const publicUrl = await onUploadAsset(file, folder);
-      onChange({
-        target: {
-          name,
-          type: "text",
-          value: publicUrl
-        }
-      });
-      setFile(null);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="image-field">
-      <label>
-        <span>{label}</span>
-        <input name={name} onChange={onChange} type="url" value={value} />
-      </label>
-
-      <div className="image-upload-row">
-        <input accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} type="file" />
-        <button className="secondary-button" disabled={!file || uploading} onClick={handleUpload} type="button">
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SiteSettingsForm({ onSaveSiteSettings, onUploadAsset, saveLoading, siteForm, statusTone }) {
-  return (
-    <form className="card stack-form" onSubmit={onSaveSiteSettings}>
-      <div className="section-heading">
-        <p className="eyebrow">Site Settings</p>
-        <h3>Global Settings</h3>
-        <p>Shared brand and footer call-to-action content used across the landing pages.</p>
-      </div>
-
-      <div className="editor-grid">
-        <label>
-          <span>Site Name</span>
-          <input name="site_name" required type="text" value={siteForm.site_name} onChange={siteForm.onChange} />
-        </label>
-
-        <ImageField
-          folder="site-settings"
-          label="Logo URL"
-          name="logo_url"
-          onChange={siteForm.onChange}
-          onUploadAsset={onUploadAsset}
-          value={siteForm.logo_url}
-        />
-
-        <label className="full-span">
-          <span>Footer CTA Title</span>
-          <input
-            name="footer_cta_title"
-            type="text"
-            value={siteForm.footer_cta_title}
-            onChange={siteForm.onChange}
-          />
-        </label>
-
-        <label className="full-span">
-          <span>Footer CTA Body</span>
-          <textarea
-            name="footer_cta_body"
-            rows="4"
-            value={siteForm.footer_cta_body}
-            onChange={siteForm.onChange}
-          />
-        </label>
-
-        <label>
-          <span>Footer Button Label</span>
-          <input
-            name="footer_cta_button_label"
-            type="text"
-            value={siteForm.footer_cta_button_label}
-            onChange={siteForm.onChange}
-          />
-        </label>
-
-        <label>
-          <span>Footer Button URL</span>
-          <input
-            name="footer_cta_button_url"
-            type="text"
-            value={siteForm.footer_cta_button_url}
-            onChange={siteForm.onChange}
-          />
-        </label>
-      </div>
-
-      <div className="editor-actions">
-        <button className="primary-button" disabled={saveLoading} type="submit">
-          Save Global Settings
-        </button>
-        <span className={`dashboard-note${statusTone === "error" ? " error" : ""}`}>
-          Shared settings affect every landing page.
-        </span>
-      </div>
-    </form>
-  );
-}
+const initialSidebarGroups = sidebarGroups.reduce(
+  (groups, group) => ({
+    ...groups,
+    [group.id]: group.id === "website-content"
+  }),
+  {}
+);
 
 function DashboardOverview({ pages }) {
   const publishedCount = pages.filter((page) => page.is_published).length;
@@ -324,14 +188,12 @@ function DashboardOverview({ pages }) {
         <div className="summary-table">
           <div className="summary-row summary-head">
             <span>Page</span>
-            <span>Slug</span>
             <span>Status</span>
             <span>Sections</span>
           </div>
           {pages.map((page) => (
             <div className="summary-row" key={page.id}>
               <span>{page.nav_label}</span>
-              <span>/{page.slug}</span>
               <span>{page.is_published ? "Published" : "Draft"}</span>
               <span>{page.sections?.length || 0}</span>
             </div>
@@ -342,385 +204,97 @@ function DashboardOverview({ pages }) {
   );
 }
 
-function DatabaseStatusBanner({ cmsDataSource, cmsError, cmsLoading, onRefreshCms }) {
-  if (cmsLoading) {
-    return (
-      <section className="database-status-banner">
-        <div>
-          <strong>Loading Supabase content</strong>
-          <span>Checking the CMS tables before enabling admin CRUD.</span>
+function SidebarDropdown({ activePanel, group, isOpen, onSelect, onToggle }) {
+  const hasActiveItem = group.items.some((item) => item.id === activePanel);
+
+  return (
+    <div className="sidebar-dropdown">
+      <button
+        aria-expanded={isOpen}
+        className={`sidebar-group-toggle${isOpen ? " open" : ""}${hasActiveItem ? " active" : ""}`}
+        onClick={() => onToggle(group.id)}
+        type="button"
+      >
+        <span>{group.title}</span>
+      </button>
+
+      {isOpen ? (
+        <div className="sidebar-submenu">
+          {group.items.map((item) => (
+            <button
+              className={`sidebar-item${activePanel === item.id ? " active" : ""}${item.disabled ? " muted" : ""}`}
+              disabled={item.disabled}
+              key={item.id}
+              onClick={() => onSelect(item)}
+              type="button"
+            >
+              <span>{item.label}</span>
+            </button>
+          ))}
         </div>
-        <button className="secondary-button" disabled type="button">
-          Refreshing...
-        </button>
-      </section>
-    );
+      ) : null}
+    </div>
+  );
+}
+
+function ModulePanel({ item }) {
+  if (item.id === "leads-contact") {
+    return <ContactLeads />;
   }
 
-  const connected = cmsDataSource === "database";
+  if (item.id === "team-applications") {
+    return <TeamApplications />;
+  }
 
   return (
-    <section className={`database-status-banner${connected ? "" : " error"}`}>
-      <div>
-        <strong>{connected ? "Connected to Supabase" : "Database content is not loaded"}</strong>
-        <span>
-          {connected
-            ? "Admin CRUD is reading from and writing to the CMS tables."
-            : cmsError || "The dashboard is showing fallback content until Supabase returns real rows."}
-        </span>
+    <section className="card stack-form">
+      <div className="section-heading">
+        <p className="eyebrow">Admin Module</p>
+        <h3>{item.label}</h3>
+        <p>This area is separate from landing page content.</p>
       </div>
-      <button className="secondary-button" onClick={onRefreshCms} type="button">
-        Refresh Content
-      </button>
+      <p className="muted-copy">Connect this module to its Supabase data table when you are ready to manage records here.</p>
     </section>
   );
 }
 
-function LandingConnectionPanel({ page }) {
-  const activeSections = (page.sections || []).filter((section) => section.is_active);
-  const activeItems = activeSections.reduce(
-    (total, section) => total + (section.items || []).filter((item) => item.is_active).length,
-    0
-  );
-  const href = slugToHref(page.slug);
+const trimTrailingSlash = (pathname) => pathname.replace(/\/+$/, "") || "/admin";
 
-  return (
-    <section className="card landing-connection-panel">
-      <div>
-        <p className="eyebrow">Landing Page</p>
-        <h3>{href}</h3>
-        <p>
-          {page.is_published
-            ? `${activeSections.length} active sections and ${activeItems} active items are available to render.`
-            : "This page is saved as a draft, so public visitors will not see it."}
-        </p>
-      </div>
+const getModuleAdminPath = (moduleId) => `/admin/modules/${moduleId}`;
 
-      <div className="landing-connection-actions">
-        <span className={`publish-pill${page.is_published ? "" : " draft"}`}>
-          {page.is_published ? "Published" : "Draft"}
-        </span>
-        <Link className="secondary-button" to={href}>
-          Open Landing Page
-        </Link>
-      </div>
-    </section>
-  );
-}
+const getRouteStateFromAdminPath = (pathname) => {
+  const normalizedPath = trimTrailingSlash(pathname);
 
-function ItemEditor({ item, onDeleteItem, onSaveItem, onUploadAsset, saveLoading }) {
-  const [form, setForm] = useState(itemDefaults);
+  if (normalizedPath === "/admin/site-information") {
+    return { activePanel: "site-settings" };
+  }
 
-  useEffect(() => {
-    setForm({
-      title: item.title || "",
-      subtitle: item.subtitle || "",
-      body: item.body || "",
-      image_url: item.image_url || "",
-      link_label: item.link_label || "",
-      link_url: item.link_url || "",
-      sort_order: item.sort_order || 0,
-      is_active: item.is_active ?? true
-    });
-  }, [item]);
+  const pageMatch = normalizedPath.match(/^\/admin\/pages\/([^/]+)$/);
+  if (pageMatch) {
+    const pageDefinition = getAdminPageDefinitionBySlug(decodeURIComponent(pageMatch[1]));
 
-  const handleChange = (event) => {
-    const { checked, name, type, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : value
-    }));
-  };
+    if (pageDefinition) {
+      return {
+        activePanel: pageDefinition.adminPanelId,
+        selectedPageSlug: pageDefinition.slug
+      };
+    }
+  }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    await onSaveItem({
-      id: item.id,
-      section_id: item.section_id,
-      ...form,
-      sort_order: Number(form.sort_order) || 0
-    });
-  };
+  const moduleMatch = normalizedPath.match(/^\/admin\/modules\/([^/]+)$/);
+  if (moduleMatch) {
+    return { activePanel: decodeURIComponent(moduleMatch[1]) };
+  }
 
-  return (
-    <form className="nested-form" onSubmit={handleSubmit}>
-      <div className="editor-grid">
-        <label>
-          <span>Item Title</span>
-          <input name="title" onChange={handleChange} required type="text" value={form.title} />
-        </label>
-
-        <label>
-          <span>Subtitle</span>
-          <input name="subtitle" onChange={handleChange} type="text" value={form.subtitle} />
-        </label>
-
-        <label className="full-span">
-          <span>Body</span>
-          <textarea name="body" onChange={handleChange} rows="4" value={form.body} />
-        </label>
-
-        <ImageField
-          folder={`items/${item.section_id}`}
-          label="Image URL"
-          name="image_url"
-          onChange={handleChange}
-          onUploadAsset={onUploadAsset}
-          value={form.image_url}
-        />
-
-        <label>
-          <span>Link Label</span>
-          <input name="link_label" onChange={handleChange} type="text" value={form.link_label} />
-        </label>
-
-        <label>
-          <span>Link URL</span>
-          <input name="link_url" onChange={handleChange} type="text" value={form.link_url} />
-        </label>
-
-        <label>
-          <span>Sort Order</span>
-          <input name="sort_order" onChange={handleChange} type="number" value={form.sort_order} />
-        </label>
-
-        <label className="checkbox-field">
-          <input checked={form.is_active} name="is_active" onChange={handleChange} type="checkbox" />
-          <span>Active</span>
-        </label>
-      </div>
-
-      <div className="editor-actions">
-        <button className="primary-button" disabled={saveLoading} type="submit">
-          Save Item
-        </button>
-        <button
-          className="secondary-button"
-          disabled={saveLoading}
-          onClick={() => onDeleteItem(item.id)}
-          type="button"
-        >
-          Delete Item
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function SectionEditor({
-  onAddItem,
-  onDeleteItem,
-  onDeleteSection,
-  onSaveItem,
-  onSaveSection,
-  onUploadAsset,
-  saveLoading,
-  section
-}) {
-  const [form, setForm] = useState(sectionDefaults);
-
-  useEffect(() => {
-    setForm({
-      section_key: section.section_key || "",
-      section_label: section.section_label || "",
-      section_type: section.section_type || "content",
-      title: section.title || "",
-      subtitle: section.subtitle || "",
-      body: section.body || "",
-      image_url: section.image_url || "",
-      primary_button_label: section.primary_button_label || "",
-      primary_button_url: section.primary_button_url || "",
-      secondary_button_label: section.secondary_button_label || "",
-      secondary_button_url: section.secondary_button_url || "",
-      sort_order: section.sort_order || 0,
-      is_active: section.is_active ?? true
-    });
-  }, [section]);
-
-  const handleChange = (event) => {
-    const { checked, name, type, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : value
-    }));
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    await onSaveSection({
-      id: section.id,
-      page_id: section.page_id,
-      ...form,
-      sort_order: Number(form.sort_order) || 0
-    });
-  };
-
-  return (
-    <article className="editor-card">
-      <form className="stack-form" onSubmit={handleSubmit}>
-        <div className="editor-grid">
-          <label>
-            <span>Section Label</span>
-            <input
-              name="section_label"
-              onChange={handleChange}
-              required
-              type="text"
-              value={form.section_label}
-            />
-          </label>
-
-          <label>
-            <span>Section Key</span>
-            <input
-              name="section_key"
-              onChange={handleChange}
-              required
-              type="text"
-              value={form.section_key}
-            />
-          </label>
-
-          <label>
-            <span>Section Type</span>
-            <select name="section_type" onChange={handleChange} value={form.section_type}>
-              <option value="content">Content</option>
-              <option value="cards">Cards</option>
-              <option value="cta">CTA</option>
-              <option value="faq">FAQ</option>
-              <option value="list">List</option>
-              <option value="hero">Hero</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Sort Order</span>
-            <input name="sort_order" onChange={handleChange} type="number" value={form.sort_order} />
-          </label>
-
-          <label className="checkbox-field">
-            <input checked={form.is_active} name="is_active" onChange={handleChange} type="checkbox" />
-            <span>Active</span>
-          </label>
-
-          <label className="full-span">
-            <span>Title</span>
-            <input name="title" onChange={handleChange} type="text" value={form.title} />
-          </label>
-
-          <label className="full-span">
-            <span>Subtitle</span>
-            <input name="subtitle" onChange={handleChange} type="text" value={form.subtitle} />
-          </label>
-
-          <label className="full-span">
-            <span>Body</span>
-            <textarea name="body" onChange={handleChange} rows="5" value={form.body} />
-          </label>
-
-          <ImageField
-            folder={`sections/${section.page_id}`}
-            label="Image URL"
-            name="image_url"
-            onChange={handleChange}
-            onUploadAsset={onUploadAsset}
-            value={form.image_url}
-          />
-
-          <label>
-            <span>Primary Button Label</span>
-            <input
-              name="primary_button_label"
-              onChange={handleChange}
-              type="text"
-              value={form.primary_button_label}
-            />
-          </label>
-
-          <label>
-            <span>Primary Button URL</span>
-            <input
-              name="primary_button_url"
-              onChange={handleChange}
-              type="text"
-              value={form.primary_button_url}
-            />
-          </label>
-
-          <label>
-            <span>Secondary Button Label</span>
-            <input
-              name="secondary_button_label"
-              onChange={handleChange}
-              type="text"
-              value={form.secondary_button_label}
-            />
-          </label>
-
-          <label>
-            <span>Secondary Button URL</span>
-            <input
-              name="secondary_button_url"
-              onChange={handleChange}
-              type="text"
-              value={form.secondary_button_url}
-            />
-          </label>
-        </div>
-
-        <div className="editor-actions">
-          <button className="primary-button" disabled={saveLoading} type="submit">
-            Save Section
-          </button>
-          <button
-            className="secondary-button"
-            disabled={saveLoading}
-            onClick={() => onAddItem(section.id)}
-            type="button"
-          >
-            Add Item
-          </button>
-          <button
-            className="secondary-button"
-            disabled={saveLoading}
-            onClick={() => onDeleteSection(section.id)}
-            type="button"
-          >
-            Delete Section
-          </button>
-        </div>
-      </form>
-
-      <div className="subeditor-list">
-        {section.items?.length ? (
-          section.items.map((item) => (
-            <ItemEditor
-              item={item}
-              key={item.id}
-              onDeleteItem={onDeleteItem}
-              onSaveItem={onSaveItem}
-              onUploadAsset={onUploadAsset}
-              saveLoading={saveLoading}
-            />
-          ))
-        ) : (
-          <p className="muted-copy">No items yet for this section.</p>
-        )}
-      </div>
-    </article>
-  );
-}
+  return { activePanel: "dashboard" };
+};
 
 function Dashboard({
-  cmsDataSource,
-  cmsError,
-  cmsLoading,
   onAddItem,
   onAddSection,
   onDeleteItem,
   onDeleteSection,
   onLogout,
-  onRefreshCms,
   onSaveItem,
   onSavePage,
   onSaveSection,
@@ -732,36 +306,72 @@ function Dashboard({
   statusMessage,
   statusTone
 }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeState = useMemo(() => getRouteStateFromAdminPath(location.pathname), [location.pathname]);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [activePanel, setActivePanel] = useState("dashboard");
-  const [siteForm, setSiteForm] = useState(siteDefaults);
+  const [openSidebarGroups, setOpenSidebarGroups] = useState(initialSidebarGroups);
   const [pageForm, setPageForm] = useState(pageDefaults);
+  const [activeModal, setActiveModal] = useState(null);
+  const [editingSection, setEditingSection] = useState(null);
 
-  const selectedPage = useMemo(
-    () => pages.find((page) => page.id === selectedPageId) || pages[0] || null,
-    [pages, selectedPageId]
-  );
   const pageBySlug = useMemo(
     () => pages.reduce((map, page) => ({ ...map, [page.slug]: page }), {}),
     [pages]
   );
+  const activePageDefinition = useMemo(
+    () => getAdminPageDefinitionByPanelId(activePanel),
+    [activePanel]
+  );
+  const selectedPage = useMemo(() => {
+    if (activePageDefinition) {
+      return pageBySlug[activePageDefinition.slug] || null;
+    }
+
+    return pages.find((page) => page.id === selectedPageId) || pages[0] || null;
+  }, [activePageDefinition, pageBySlug, pages, selectedPageId]);
+  const activeSidebarItem = useMemo(
+    () => sidebarGroups.flatMap((group) => group.items).find((item) => item.id === activePanel) || null,
+    [activePanel]
+  );
+  const isPagePanel = activeSidebarItem?.type === "page";
+  const isModulePanel = activeSidebarItem?.type === "module";
 
   useEffect(() => {
-    if (!selectedPageId && pages[0]?.id) {
+    setActivePanel(routeState.activePanel);
+
+    if (routeState.selectedPageSlug) {
+      const targetPage = pageBySlug[routeState.selectedPageSlug];
+
+      if (targetPage) {
+        setSelectedPageId(targetPage.id);
+      }
+    }
+  }, [pageBySlug, routeState.activePanel, routeState.selectedPageSlug]);
+
+  useEffect(() => {
+    const activeGroup = sidebarGroups.find((group) => group.items.some((item) => item.id === activePanel));
+
+    if (!activeGroup) {
+      return;
+    }
+
+    setOpenSidebarGroups((current) =>
+      current[activeGroup.id]
+        ? current
+        : {
+            ...current,
+            [activeGroup.id]: true
+          }
+    );
+  }, [activePanel]);
+
+  useEffect(() => {
+    if (!selectedPageId && !activePageDefinition && pages[0]?.id) {
       setSelectedPageId(pages[0].id);
     }
-  }, [pages, selectedPageId]);
-
-  useEffect(() => {
-    setSiteForm({
-      site_name: siteSettings.site_name || "",
-      logo_url: siteSettings.logo_url || "",
-      footer_cta_title: siteSettings.footer_cta_title || "",
-      footer_cta_body: siteSettings.footer_cta_body || "",
-      footer_cta_button_label: siteSettings.footer_cta_button_label || "",
-      footer_cta_button_url: siteSettings.footer_cta_button_url || ""
-    });
-  }, [siteSettings]);
+  }, [activePageDefinition, pages, selectedPageId]);
 
   useEffect(() => {
     if (!selectedPage) {
@@ -782,18 +392,11 @@ function Dashboard({
       hero_secondary_button_label: selectedPage.hero_secondary_button_label || "",
       hero_secondary_button_url: selectedPage.hero_secondary_button_url || "",
       hero_image_url: selectedPage.hero_image_url || "",
+      hero_visible: selectedPage.hero_visible ?? true,
       sort_order: selectedPage.sort_order || 0,
       is_published: selectedPage.is_published ?? true
     });
   }, [selectedPage]);
-
-  const handleSiteChange = (event) => {
-    const { name, value } = event.target;
-    setSiteForm((current) => ({
-      ...current,
-      [name]: value
-    }));
-  };
 
   const handlePageChange = (event) => {
     const { checked, name, type, value } = event.target;
@@ -801,18 +404,6 @@ function Dashboard({
       ...current,
       [name]: type === "checkbox" ? checked : value
     }));
-  };
-
-  const submitSiteSettings = async (event) => {
-    event.preventDefault();
-    await onSaveSiteSettings({
-      site_name: siteForm.site_name,
-      logo_url: siteForm.logo_url,
-      footer_cta_title: siteForm.footer_cta_title,
-      footer_cta_body: siteForm.footer_cta_body,
-      footer_cta_button_label: siteForm.footer_cta_button_label,
-      footer_cta_button_url: siteForm.footer_cta_button_url
-    });
   };
 
   const submitPage = async (event) => {
@@ -828,6 +419,30 @@ function Dashboard({
       ...pageForm,
       sort_order: Number(pageForm.sort_order) || 0
     });
+    setActiveModal(null);
+  };
+
+  const savePageFieldPatch = async (fieldPatch) => {
+    if (!selectedPage) {
+      return;
+    }
+
+    await onSavePage({
+      id: selectedPage.id,
+      slug: selectedPage.slug,
+      ...pageForm,
+      ...fieldPatch,
+      sort_order: Number(pageForm.sort_order) || 0
+    });
+  };
+
+  const toggleHeroVisible = async () => {
+    const nextVisible = !(pageForm.hero_visible ?? true);
+    setPageForm((current) => ({
+      ...current,
+      hero_visible: nextVisible
+    }));
+    await savePageFieldPatch({ hero_visible: nextVisible });
   };
 
   const handleSidebarSelect = (item) => {
@@ -835,281 +450,136 @@ function Dashboard({
       return;
     }
 
-    if (item.id === "dashboard" || item.id === "site-settings") {
+    if (item.id === "dashboard") {
       setActivePanel(item.id);
+      navigate("/admin");
+      return;
+    }
+
+    if (item.id === "site-settings") {
+      setActivePanel(item.id);
+      navigate("/admin/site-information");
+      return;
+    }
+
+    if (item.type === "module") {
+      setActivePanel(item.id);
+      navigate(getModuleAdminPath(item.id));
       return;
     }
 
     const targetPage = pageBySlug[item.helper] || pageBySlug[item.id];
+    setActivePanel(item.id);
+    navigate(item.path || `/admin/pages/${item.helper}`);
 
     if (targetPage) {
       setSelectedPageId(targetPage.id);
-      setActivePanel(item.id);
     }
+  };
+
+  const toggleSidebarGroup = (groupId) => {
+    setOpenSidebarGroups((current) => ({
+      ...current,
+      [groupId]: !current[groupId]
+    }));
   };
 
   return (
     <section className="dashboard-card admin-dashboard">
-      <div className="dashboard-topbar">
-        <div className="admin-search">
-          <input placeholder="Search pages, sections, content..." type="text" />
-        </div>
-
-        <div className="admin-toolbar">
-          <span className="admin-notice">Admin User</span>
-          <button className="secondary-button" onClick={onLogout} type="button">
-            Logout
-          </button>
-        </div>
-      </div>
-
       <div className="dashboard-shell">
         <aside className="dashboard-sidebar">
           <div className="sidebar-brand">
-            <div className="sidebar-logo-mark">S</div>
-            <div>
-              <strong>Secure Wealth</strong>
-              <span>Agency Admin</span>
-            </div>
+            {siteSettings.logo_url ? (
+              <img alt="" className="sidebar-brand-logo" src={siteSettings.logo_url} />
+            ) : (
+              <div className="sidebar-logo-mark" aria-hidden="true">S</div>
+            )}
+            <span className="sidebar-brand-name">{siteSettings.site_name || "Admin Dashboard"}</span>
           </div>
 
-          <div className="sidebar-group">
-            <button
-              className={`sidebar-item${activePanel === "dashboard" ? " active" : ""}`}
-              onClick={() => handleSidebarSelect({ id: "dashboard" })}
-              type="button"
-            >
-              <span>Dashboard</span>
-            </button>
+          <nav aria-label="Admin navigation" className="sidebar-nav">
+            <div className="sidebar-group">
+              <button
+                className={`sidebar-item${activePanel === "dashboard" ? " active" : ""}`}
+                onClick={() => handleSidebarSelect({ id: "dashboard" })}
+                type="button"
+              >
+                <span>Dashboard</span>
+              </button>
+            </div>
+
+            {sidebarGroups.map((group) => (
+              <SidebarDropdown
+                activePanel={activePanel}
+                group={group}
+                isOpen={openSidebarGroups[group.id]}
+                key={group.id}
+                onSelect={handleSidebarSelect}
+                onToggle={toggleSidebarGroup}
+              />
+            ))}
+          </nav>
+
+          <div className="sidebar-bottom">
             <button
               className={`sidebar-item${activePanel === "site-settings" ? " active" : ""}`}
               onClick={() => handleSidebarSelect({ id: "site-settings" })}
               type="button"
             >
-              <span>Site Settings</span>
+              <span>Site Information</span>
+            </button>
+            <button className="sidebar-item sidebar-logout" onClick={onLogout} type="button">
+              <span>Logout</span>
             </button>
           </div>
-
-          {sidebarGroups.map((group) => (
-            <div className="sidebar-group" key={group.title}>
-              <p className="sidebar-label">{group.title}</p>
-              {group.items.map((item) => (
-                <button
-                  className={`sidebar-item${activePanel === item.id ? " active" : ""}${item.disabled ? " muted" : ""}`}
-                  key={item.id}
-                  onClick={() => handleSidebarSelect(item)}
-                  type="button"
-                >
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
         </aside>
 
         <div className="dashboard-main">
-          <div className="dashboard-scroll">
-            <DatabaseStatusBanner
-              cmsDataSource={cmsDataSource}
-              cmsError={cmsError}
-              cmsLoading={cmsLoading}
-              onRefreshCms={onRefreshCms}
-            />
+          <div className="dashboard-topbar">
+            <div className="admin-search">
+              <input placeholder="Search pages, sections, content..." type="text" />
+            </div>
 
+            <div className="admin-toolbar">
+              <span className="admin-notice">Admin User</span>
+            </div>
+          </div>
+
+          <div className="dashboard-scroll">
             {activePanel === "dashboard" ? (
               <DashboardOverview pages={pages} />
             ) : activePanel === "site-settings" ? (
-              <SiteSettingsForm
-                onSaveSiteSettings={submitSiteSettings}
+              <SiteInformation
+                onSaveSiteSettings={onSaveSiteSettings}
                 onUploadAsset={onUploadAsset}
                 saveLoading={saveLoading}
-                siteForm={{ ...siteForm, onChange: handleSiteChange }}
+                siteSettings={siteSettings}
                 statusTone={statusTone}
               />
+            ) : isModulePanel && activeSidebarItem ? (
+              <ModulePanel item={activeSidebarItem} />
             ) : null}
-            {activePanel !== "dashboard" && activePanel !== "site-settings" && selectedPage ? (
-              <div className="dashboard-stack">
-                <LandingConnectionPanel page={selectedPage} />
-
-                <div className="card stack-form">
-                  <div className="section-heading">
-                    <h3>Page Editor</h3>
-                    <p>Edit the selected page content and metadata.</p>
-                  </div>
-
-                  <form className="stack-form" onSubmit={submitPage}>
-                    <div className="editor-grid">
-                      <label>
-                        <span>Navigation Label</span>
-                        <input
-                          name="nav_label"
-                          onChange={handlePageChange}
-                          required
-                          type="text"
-                          value={pageForm.nav_label}
-                        />
-                      </label>
-
-                      <label>
-                        <span>Slug</span>
-                        <input disabled readOnly type="text" value={selectedPage.slug} />
-                      </label>
-
-                      <label className="full-span">
-                        <span>Page Title</span>
-                        <input
-                          name="page_title"
-                          onChange={handlePageChange}
-                          required
-                          type="text"
-                          value={pageForm.page_title}
-                        />
-                      </label>
-
-                      <label className="full-span">
-                        <span>Page Description</span>
-                        <textarea
-                          name="page_description"
-                          onChange={handlePageChange}
-                          rows="4"
-                          value={pageForm.page_description}
-                        />
-                      </label>
-
-                      <label>
-                        <span>SEO Title</span>
-                        <input name="seo_title" onChange={handlePageChange} type="text" value={pageForm.seo_title} />
-                      </label>
-
-                      <label>
-                        <span>SEO Description</span>
-                        <input
-                          name="seo_description"
-                          onChange={handlePageChange}
-                          type="text"
-                          value={pageForm.seo_description}
-                        />
-                      </label>
-
-                      <label className="full-span">
-                        <span>Hero Title</span>
-                        <input name="hero_title" onChange={handlePageChange} type="text" value={pageForm.hero_title} />
-                      </label>
-
-                      <label className="full-span">
-                        <span>Hero Body</span>
-                        <textarea name="hero_body" onChange={handlePageChange} rows="5" value={pageForm.hero_body} />
-                      </label>
-
-                      <label>
-                        <span>Hero Primary Button Label</span>
-                        <input
-                          name="hero_primary_button_label"
-                          onChange={handlePageChange}
-                          type="text"
-                          value={pageForm.hero_primary_button_label}
-                        />
-                      </label>
-
-                      <label>
-                        <span>Hero Primary Button URL</span>
-                        <input
-                          name="hero_primary_button_url"
-                          onChange={handlePageChange}
-                          type="text"
-                          value={pageForm.hero_primary_button_url}
-                        />
-                      </label>
-
-                      <label>
-                        <span>Hero Secondary Button Label</span>
-                        <input
-                          name="hero_secondary_button_label"
-                          onChange={handlePageChange}
-                          type="text"
-                          value={pageForm.hero_secondary_button_label}
-                        />
-                      </label>
-
-                      <label>
-                        <span>Hero Secondary Button URL</span>
-                        <input
-                          name="hero_secondary_button_url"
-                          onChange={handlePageChange}
-                          type="text"
-                          value={pageForm.hero_secondary_button_url}
-                        />
-                      </label>
-
-                      <ImageField
-                        folder={`pages/${selectedPage.slug}`}
-                        label="Hero Image URL"
-                        name="hero_image_url"
-                        onChange={handlePageChange}
-                        onUploadAsset={onUploadAsset}
-                        value={pageForm.hero_image_url}
-                      />
-
-                      <label>
-                        <span>Sort Order</span>
-                        <input name="sort_order" onChange={handlePageChange} type="number" value={pageForm.sort_order} />
-                      </label>
-
-                      <label className="checkbox-field">
-                        <input
-                          checked={pageForm.is_published}
-                          name="is_published"
-                          onChange={handlePageChange}
-                          type="checkbox"
-                        />
-                        <span>Published</span>
-                      </label>
-                    </div>
-
-                    <button className="primary-button" disabled={saveLoading} type="submit">
-                      Save Page
-                    </button>
-                  </form>
-                </div>
-
-                <div className="card stack-form">
-                  <div className="section-heading">
-                    <h3>Section Editor</h3>
-                    <p>Each section is content-only. Add cards or CTA data here.</p>
-                  </div>
-
-                  <div className="editor-actions">
-                    <button
-                      className="primary-button"
-                      disabled={saveLoading}
-                      onClick={() => onAddSection(selectedPage.id)}
-                      type="button"
-                    >
-                      Add Section
-                    </button>
-                  </div>
-
-                  {selectedPage.sections?.length ? (
-                    <div className="section-editor-list">
-                      {selectedPage.sections.map((section) => (
-                        <SectionEditor
-                          key={section.id}
-                          onAddItem={onAddItem}
-                          onDeleteItem={onDeleteItem}
-                          onDeleteSection={onDeleteSection}
-                          onSaveItem={onSaveItem}
-                          onSaveSection={onSaveSection}
-                          onUploadAsset={onUploadAsset}
-                          saveLoading={saveLoading}
-                          section={section}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted-copy">This page does not have any sections yet.</p>
-                  )}
-                </div>
-              </div>
+            {isPagePanel && selectedPage ? (
+              <PageEditorPanel
+                activeModal={activeModal}
+                editingSection={editingSection}
+                onActiveModalChange={setActiveModal}
+                onAddItem={onAddItem}
+                onAddSection={onAddSection}
+                onDeleteItem={onDeleteItem}
+                onDeleteSection={onDeleteSection}
+                onEditingSectionChange={setEditingSection}
+                onPageChange={handlePageChange}
+                onSaveItem={onSaveItem}
+                onSaveSection={onSaveSection}
+                onSubmitPage={submitPage}
+                onToggleHeroVisible={toggleHeroVisible}
+                onUploadAsset={onUploadAsset}
+                page={selectedPage}
+                pageDefinition={activePageDefinition}
+                pageForm={pageForm}
+                saveLoading={saveLoading}
+              />
             ) : null}
           </div>
         </div>
